@@ -1,0 +1,14 @@
+阿里云部署
+前端nginx负载连接tomcat
+mysql数据库
+spring mvc+mybatis+spring+spring security
+
+Jenkins+snv+maven
+
+2016年5月10日
+1.自定义AuthenticationProvider,限制连续登陆3次失败后账户锁定
+
+2016年5月11日
+1.增加自定义验证异常信息显示--LoginLogoutController
+2.增加类BaseController
+3.spitter-servlet.xml增加了国际化文件(后期有时间需全部替换为国际化)

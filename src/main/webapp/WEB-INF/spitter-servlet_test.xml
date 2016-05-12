@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" xmlns:security="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.1.xsd 
+		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.1.xsd">
+	
+	<!-- 不要过滤图片等静态资源，其中**代表可以跨越目录，*不可以跨越目录。 -->  
+	<security:http pattern="/**/*.jpg" security="none" />
+	<security:http pattern="/**/*.png" security="none" />
+	<security:http pattern="/**/*.gif" security="none" />
+	<security:http pattern="/**/*.css" security="none" />
+	<security:http pattern="/**/*.js" security="none" />
+	<security:http pattern="/login.do" security="none" />
+	<security:http pattern="/*/regeist" security="none" />
+	<security:http pattern="/views/login.jsp" security="none" />
+	<security:http pattern="/views/timeout.jsp" security="none" />
+	<!-- <security:http pattern="/resources*" security="none" />
+	<security:http pattern="/common*" security="none" /> -->
+	<security:http auto-config="true">
+		<security:intercept-url pattern="/**/*.jsp"
+			access="ROLE_POWER" />
+		<security:intercept-url pattern="/**.html"
+			access="ROLE_POWER" />
+		<security:intercept-url pattern="**"
+			access="ROLE_ADMIN" />
+		<security:form-login login-page="/login.do"
+			authentication-failure-url="/login.do?error" authentication-success-handler-ref="mySuccessHandler"/>
+
+		<!-- access denied page -->
+		<security:access-denied-handler
+			error-page="/403" />
+
+		<!-- 实现免登陆验证 -->
+		<security:remember-me key="jbcpPetStore" />
+
+		<!-- 登出session失效 -->
+		<!-- 
+        logout-url 属性:这个指定的URL会触发注销操作，默认是 /j_spring_security_logout
+        invalidate-session 属性：如果为true，在注销的时候会销毁会话
+        delete-cookies 属性：以逗号分隔的cookies名称，在用户注销时删除指定的cookies
+        -->
+		<security:logout invalidate-session="true" logout-url="/login.do?logout" delete-cookies="JSESSIONID"/>
+	
+		<!-- SESSION超时后跳转到该页面 -->
+        <security:session-management invalid-session-url="/timeout" session-fixation-protection="none">
+        	<!-- <security:concurrency-control max-sessions="1" error-if-maximum-exceeded="true" expired-url="/login.do"/>   -->
+        </security:session-management>
+         
+	</security:http>
+
+
+	<security:authentication-manager
+		erase-credentials="false">
+		<!-- 使用基本 -->
+		<!-- <security:authentication-provider>
+			<security:user-service>
+				<security:user authorities="ROLE_POWER,ROLE_ADMIN" name="stevex"
+					password="stevex" />
+				<security:user authorities="ROLE_POWER,ROLE_ADMIN" name="admin"
+					password="admin" />
+			</security:user-service>
+		</security:authentication-provider>
+ 	-->
+	<!--	<security:authentication-provider>
+			<security:password-encoder ref="encoder">
+			</security:password-encoder>
+			<security:jdbc-user-service
+				data-source-ref="dataSource"
+				users-by-username-query="select d_username username,d_password password, d_enabled enabled from t_users where d_username=?"
+				authorities-by-username-query="select d_username username, d_role role from t_user_roles where d_username=?  " />
+		</security:authentication-provider>
+	-->	
+		<security:authentication-provider ref="authenticationProvider" />
+	</security:authentication-manager>
+
+
+	<bean id="authenticationProvider"
+         class="com.habuma.spitter.provider.LimitLoginAuthenticationProvider">
+         <property name="passwordEncoder" ref="encoder" />
+         <property name="userDetailsDao" ref="userDetailsDao" />
+          <property name="userDetailsService" ref="customUserDetailsService" />
+     </bean>
+
+	<bean id="customUserDetailsService" class="com.habuma.spitter.service.impl.CustomUserDetailsService">
+		<property name="usersByUsernameQuery"
+			value="SELECT d_username username,d_password password, d_enabled enabled,d_accountnonexpired accountnonexpired,d_accountnonlocked accountnonlocked,d_credentialsnonexpired credentialsnonexpired FROM t_users WHERE d_username=?" />
+		<property name="authoritiesByUsernameQuery"
+			value="SELECT d_username username, d_role role FROM t_user_roles WHERE d_username=?" />
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	
+	<mvc:resources location="/resources/" mapping="/resources/**" />
+
+	<!--
+		会自动注册DefaultAnnotationHandlerMapping与AnnotationMethodHandlerAdapter
+		两个bean 是spring MVC为@Controllers分发请求所必须的。
+		并提供了：数据绑定支持，@NumberFormatannotation支持，
+		@DateTimeFormat支持，@Valid支持，读写XML的支持（JAXB），读写JSON的支持（Jackson）。
+	
+	<mvc:annotation-driven />-->
+	 <mvc:annotation-driven>
+           <mvc:message-converters register-defaults="true">
+            <!-- 避免IE执行AJAX时,返回JSON出现下载文件-->
+            <bean id="fastJsonHttpMessageConverter"
+                class="com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter">
+                <property name="supportedMediaTypes">
+                    <list>
+                        <value>text/html;charset=UTF-8</value>
+                    </list>
+                </property>
+            </bean>
+        </mvc:message-converters> 
+    </mvc:annotation-driven>
+
+	<!-- 自动扫描controller包下的所有类，如果@Controller注入为bean -->
+	<context:component-scan base-package="com.habuma.spitter.controller"></context:component-scan>
+
+	<bean id="encoder"
+        class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder">
+        <constructor-arg name="strength" value="9" />
+     </bean>
+	
+	<bean id="userDetailsDao"
+        class="com.habuma.spitter.dao.impl.UserDetailsDaoImpl">
+         <property name="dataSource" ref="dataSource" />
+     </bean>
+	
+	<bean
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix" value="/views/"></property>
+		<property name="suffix" value=".jsp"></property>
+	</bean>
+
+	<!-- 验证成功后跳转的方法 --> 
+	<bean id="mySuccessHandler" class="com.habuma.spitter.handle.LoginSuccessHandle">
+	  <!-- 登录成功后转发到该页面-->  
+		<property name="defaultTargetUrl"> 
+           <value>/home</value>  
+        </property>  
+         
+	</bean>
+	
+	<!-- session超时，登陆探测过滤器
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/**" />
+			<bean class="com.habuma.spitter.Interceptor.SessionTimeoutInterceptor">
+				<property name="allowUrls">
+					<list>
+						<value>/login</value>
+						<value>.jpg</value>
+						<value>.gif</value>
+						<value>.js</value>
+						<value>.bmp</value>
+						<value>.png</value>
+						<value>.css</value>
+						<value>/submit</value>
+						<value>/logout</value>
+						<value>/login.jsp</value>
+						<value>/error.jsp</value>
+						<value>/timeout.jsp</value>
+					</list>
+				</property>
+			</bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+	 -->
+	
+	
+	
+	<!-- 异常处理 -->
+	<bean
+		class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+		<!-- 定义默认的异常处理页面，当该异常类型的注册时使用 -->  
+		<property name="defaultErrorView" value="error" />
+		 <!-- 定义异常处理页面用来获取异常信息的变量名，默认名为exception -->  
+    	<property name="exceptionAttribute" value="ex"></property>  
+    	<!-- 定义需要特殊处理的异常，用类名或完全路径名作为key，异常页名作为值 -->
+    	<property name="exceptionMappings">
+			<props>
+			    <!-- 表示当抛出NumberFormatException的时候就返回名叫error/system_error的视图 -->
+				<prop key="java.lang.NumberFormatException">error</prop>
+				<prop key="java.lang.NullPointerException">error</prop>
+				<prop key="com.habuma.spitter.Exception.SessionTimeoutException">error-business</prop>
+			</props>
+		</property>
+		<property name="statusCodes"><!-- 定义在发生异常时视图跟返回码的对应关系 -->
+			<props>
+			    <!-- 表示在发生NumberFormatException时返回视图error/system_error，然后这里定义发生异常时视图error/system_error对应的HttpServletResponse的返回码是500 -->
+				<prop key="error">500</prop>
+				<prop key="error">503</prop>
+				<prop key="error">501</prop>
+			</props>
+		</property>
+	</bean>
+	
+</beans>
