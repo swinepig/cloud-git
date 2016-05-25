@@ -18,5 +18,6 @@ public class BaseController {
 	@ModelAttribute("numberUsers")
 	public int getNumberOfUsers(){
 		return sessionRegistry.getAllPrincipals().size();
+		
 	}
 }
